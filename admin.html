@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Night Garage — Admin</title>
+
+<link rel="icon" type="image/png" sizes="32x32" href="https://i.ibb.co/Df33fVRN/MC.png">
+<meta name="theme-color" content="#130f1f">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --carbon:#130f1f;
+    --gunmetal:#1b1531;
+    --plate:#241c40;
+    --steel:#4c3d74;
+    --steel-soft:#2d2452;
+    --ink:#f1ecfc;
+    --dim:#a99bcf;
+    --amber:#ffb020;
+    --amber-dim:#5a4415;
+    --redline:#ff3b3b;
+    --radius:10px;
+    --font-display:'Rajdhani',sans-serif;
+    --font-body:'IBM Plex Sans',ui-sans-serif,system-ui,Arial;
+    --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      repeating-linear-gradient(115deg, rgba(255,255,255,.015) 0 2px, transparent 2px 4px),
+      var(--carbon);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3{margin:0}
+
+  .wrap{max-width:980px;margin:0 auto;padding:22px 18px 60px}
+
+  .marquee{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:var(--gunmetal);border:1px solid var(--steel);border-radius:var(--radius);
+    padding:16px 20px;position:relative;overflow:hidden;
+  }
+  .marquee::before{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
+    background:repeating-linear-gradient(115deg,var(--amber) 0 14px,var(--carbon) 14px 28px);
+  }
+  .badge{display:flex;align-items:center;gap:14px}
+  .crest{
+    width:46px;height:46px;border-radius:8px;flex:none;
+    background:var(--plate);border:1px solid var(--steel);
+    display:grid;place-items:center;font-size:22px;
+  }
+  .badge h1{font-family:var(--font-display);font-size:1.3rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .badge .sub{color:var(--dim);font-size:.8rem;margin-top:2px}
+
+  .action{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:10px 16px;border-radius:8px;border:1px solid var(--steel);
+    background:var(--steel-soft);color:var(--ink);cursor:pointer;
+    font-family:var(--font-display);font-weight:600;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;
+  }
+  .action:hover{border-color:var(--amber)}
+  .action--primary{background:var(--amber);border-color:var(--amber);color:#1a1200}
+  .action--primary:hover{filter:brightness(1.06)}
+  .action--danger{color:var(--redline);border-color:var(--redline)}
+  .action--danger:hover{background:var(--redline);color:#fff}
+
+  .panel{
+    background:var(--gunmetal);border:1px solid var(--steel);border-radius:var(--radius);
+    margin-top:20px;
+  }
+  .panel > h2{
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;font-size:1rem;
+    padding:14px 18px;border-bottom:1px solid var(--steel);color:var(--dim);
+  }
+  .panel-body{padding:18px}
+
+  .center-card{
+    max-width:460px;margin:60px auto 0;background:var(--gunmetal);border:1px solid var(--steel);
+    border-radius:var(--radius);padding:30px;text-align:center;
+  }
+  .center-card p{color:var(--dim);font-size:.92rem;line-height:1.5;margin:10px 0 18px}
+  .uid-box{
+    font-family:var(--font-mono);font-size:.8rem;background:var(--plate);border:1px solid var(--steel);
+    border-radius:8px;padding:10px 12px;word-break:break-all;margin:14px 0;color:var(--ink);
+  }
+
+  .stubs{display:flex;gap:6px;padding:14px 18px 0}
+  .stub{
+    flex:1;text-align:center;padding:10px;border-radius:6px 6px 0 0;
+    background:var(--steel-soft);border:1px solid var(--steel);border-bottom:none;
+    font-family:var(--font-display);font-weight:600;letter-spacing:.03em;text-transform:uppercase;font-size:.85rem;
+    color:var(--dim);cursor:pointer;
+  }
+  .stub[aria-selected="true"]{color:var(--amber);background:var(--plate)}
+
+  .bin-group{margin-bottom:18px}
+  .bin-group:last-child{margin-bottom:0}
+  .bin-group h3{
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;
+    font-size:.85rem;color:var(--amber);padding-bottom:8px;border-bottom:1px solid var(--steel-soft);margin-bottom:10px;
+  }
+
+  .item-row{
+    display:grid;grid-template-columns:1fr 110px 70px auto auto;gap:8px;align-items:center;
+    padding:8px 0;border-bottom:1px solid var(--steel-soft);
+  }
+  .item-row:last-child{border-bottom:none}
+  .item-row input{
+    background:var(--plate);border:1px solid var(--steel);border-radius:6px;padding:8px 10px;
+    color:var(--ink);font-family:var(--font-body);font-size:.85rem;width:100%;
+  }
+  .item-row input[type="number"]{font-family:var(--font-mono)}
+  .item-row .id-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--dim)}
+
+  .add-form{
+    margin-top:16px;padding-top:16px;border-top:1px dashed var(--steel);
+    display:grid;grid-template-columns:1fr 1fr 1fr 120px auto;gap:8px;align-items:end;
+  }
+  .add-form label{font-size:.72rem;color:var(--dim);display:block;margin-bottom:4px}
+  .add-form input,.add-form select{
+    background:var(--plate);border:1px solid var(--steel);border-radius:6px;padding:8px 10px;
+    color:var(--ink);font-family:var(--font-body);font-size:.85rem;width:100%;
+  }
+
+  .order-entry{border:1px solid var(--steel);border-radius:8px;background:var(--plate);padding:12px;margin-bottom:10px}
+  .order-entry:last-child{margin-bottom:0}
+  .order-entry .head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .order-entry .head strong{font-family:var(--font-mono);font-size:.85rem}
+  .order-entry .meta{color:var(--dim);font-size:.78rem;margin-top:3px;font-family:var(--font-mono)}
+  .order-entry .amount{font-family:var(--font-mono);font-weight:600;color:var(--amber)}
+  .order-entry details{margin-top:8px;color:var(--dim);font-size:.82rem}
+  .order-entry summary{cursor:pointer}
+  .order-entry ul{margin:6px 0 0 16px;padding:0}
+  .order-entry .row-actions{display:flex;justify-content:flex-end;margin-top:10px}
+  .empty-note{color:var(--dim);font-family:var(--font-mono);font-size:.85rem;text-align:center;padding:20px 0}
+
+  dialog{
+    width:min(460px,92vw);border:1px solid var(--steel);background:var(--gunmetal);color:var(--ink);
+    border-radius:10px;padding:0;box-shadow:0 30px 70px rgba(0,0,0,.6);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  .slip-head{
+    display:flex;justify-content:space-between;align-items:center;padding:14px 16px;
+    border-bottom:1px solid var(--steel);font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;font-size:.95rem;
+  }
+  .slip-body{padding:16px;display:grid;gap:12px}
+  .slip-actions{display:flex;justify-content:flex-end;gap:10px}
+
+  [hidden]{display:none !important}
+</style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="marquee">
+      <div class="badge">
+        <div class="crest" aria-hidden="true">🏁</div>
+        <div>
+          <h1>Night Garage — Admin</h1>
+          <div class="sub" id="whoami">Not signed in</div>
+        </div>
+      </div>
+      <div>
+        <button class="action" id="signOutBtn" hidden>Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Signed out -->
+    <div class="center-card" id="screenLogin" hidden>
+      <h2 style="font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em">Admin Sign-In</h2>
+      <p>This panel manages the live catalog and order history. Sign in with Discord to continue.</p>
+      <button class="action action--primary" id="signInBtn">Sign in with Discord</button>
+    </div>
+
+    <!-- Signed in, not an admin -->
+    <div class="center-card" id="screenUnauthorized" hidden>
+      <h2 style="font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em">Not Authorized</h2>
+      <p>Access is granted to anyone holding the <strong>Midnight</strong> role in the Discord server. We didn't find that role on this account.</p>
+      <p>If you were just given the role, sign out and back in to re-check. Otherwise, an existing admin can grant access manually by running this in the Supabase SQL editor:</p>
+      <div class="uid-box" id="grantSql"></div>
+      <button class="action" id="signOutBtn2">Sign Out</button>
+    </div>
+
+    <!-- Admin -->
+    <div id="screenAdmin" hidden>
+      <div class="panel">
+        <div class="stubs" role="tablist">
+          <div class="stub" data-stub="catalog" aria-selected="true">🧰 Catalog</div>
+          <div class="stub" data-stub="orders" aria-selected="false">📜 Orders</div>
+        </div>
+
+        <div class="panel-body" id="view-catalog">
+          <div id="catalogGroups"></div>
+
+          <div class="add-form">
+            <div>
+              <label>Bin</label>
+              <select id="newBin">
+                <option value="parts">Parts &amp; Body</option>
+                <option value="cosmetics">Cosmetic Upgrades</option>
+                <option value="brakes">Performance: Brakes</option>
+                <option value="suspension">Performance: Suspension</option>
+                <option value="transmission">Performance: Transmission</option>
+                <option value="armor">Performance: Armor</option>
+                <option value="turbo">Performance: Turbo</option>
+                <option value="engine">Performance: Engine</option>
+              </select>
+            </div>
+            <div>
+              <label>ID (slug)</label>
+              <input id="newId" placeholder="e.g. rear-wing" />
+            </div>
+            <div>
+              <label>Name</label>
+              <input id="newName" placeholder="e.g. 🧩 Rear Wing" />
+            </div>
+            <div>
+              <label>Price (blank = custom)</label>
+              <input id="newPrice" type="number" min="0" step="25" placeholder="—" />
+            </div>
+            <button class="action action--primary" id="addItemBtn">Add Item</button>
+          </div>
+        </div>
+
+        <div class="panel-body" id="view-orders" hidden>
+          <div id="ordersList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="slipAlert">
+    <div class="slip-head"><span id="slipAlertTitle">Notice</span><button class="action" id="slipAlertClose">✕</button></div>
+    <div class="slip-body">
+      <div id="slipAlertMessage"></div>
+      <div class="slip-actions"><button class="action action--primary" id="slipAlertOk">OK</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="slipConfirm">
+    <div class="slip-head"><span id="slipConfirmTitle">Please Confirm</span><button class="action" id="slipConfirmClose">✕</button></div>
+    <div class="slip-body">
+      <div id="slipConfirmMessage"></div>
+      <div class="slip-actions">
+        <button class="action" id="slipConfirmCancel">Cancel</button>
+        <button class="action action--danger" id="slipConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+<script>
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://gpaqlehknskrcthyaapo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwYXFsZWhrbnNrcmN0aHlhYXBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NjQwMjEsImV4cCI6MjA5ODI0MDAyMX0.pVsGNoYVNsh6w0RTTCajtveVJ12wgxxgP1Vqhl2EOxQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storageKey: 'mc-night-garage-admin-auth' }
+});
+
+const BIN_LABELS = {
+  parts:'Parts & Body', cosmetics:'Cosmetic Upgrades',
+  brakes:'Performance: Brakes', suspension:'Performance: Suspension',
+  transmission:'Performance: Transmission', armor:'Performance: Armor',
+  turbo:'Performance: Turbo', engine:'Performance: Engine'
+};
+const BIN_ORDER = ['parts','cosmetics','brakes','suspension','transmission','armor','turbo','engine'];
+const money = n => n == null ? '—' : '$' + Number(n).toFixed(2);
+
+// ---------- Alert / confirm dialogs ----------
+const slipAlert = document.getElementById('slipAlert');
+function flashAlert(message, title = 'Notice'){
+  document.getElementById('slipAlertTitle').textContent = title;
+  document.getElementById('slipAlertMessage').textContent = message;
+  slipAlert.showModal();
+}
+document.getElementById('slipAlertClose').onclick = () => slipAlert.close();
+document.getElementById('slipAlertOk').onclick = () => slipAlert.close();
+
+const slipConfirm = document.getElementById('slipConfirm');
+let confirmCallback = null;
+function flashConfirm(message, onConfirm, title = 'Please Confirm'){
+  document.getElementById('slipConfirmTitle').textContent = title;
+  document.getElementById('slipConfirmMessage').textContent = message;
+  confirmCallback = onConfirm;
+  slipConfirm.showModal();
+}
+document.getElementById('slipConfirmClose').onclick = () => slipConfirm.close();
+document.getElementById('slipConfirmCancel').onclick = () => slipConfirm.close();
+document.getElementById('slipConfirmOk').onclick = () => {
+  slipConfirm.close();
+  if(typeof confirmCallback === 'function') confirmCallback();
+  confirmCallback = null;
+};
+
+// ---------- Discord role gate ----------
+const DISCORD_GUILD_ID = '1109059313437261834';
+const MIDNIGHT_ROLE_ID = '1526151086858043503';
+
+async function checkMidnightRole(providerToken){
+  const res = await fetch(`https://discord.com/api/users/@me/guilds/${DISCORD_GUILD_ID}/member`, {
+    headers: { Authorization: `Bearer ${providerToken}` }
+  });
+  if(!res.ok) return false; // not a member of that server, or token missing the scope
+  const member = await res.json();
+  return Array.isArray(member.roles) && member.roles.includes(MIDNIGHT_ROLE_ID);
+}
+
+// ---------- Auth ----------
+document.getElementById('signInBtn').addEventListener('click', () => {
+  sb.auth.signInWithOAuth({
+    provider:'discord',
+    options:{
+      redirectTo: window.location.href,
+      scopes:'identify guilds.members.read'
+    }
+  });
+});
+document.getElementById('signOutBtn').addEventListener('click', () => sb.auth.signOut());
+document.getElementById('signOutBtn2').addEventListener('click', () => sb.auth.signOut());
+
+function showScreen(name){
+  document.getElementById('screenLogin').hidden = name !== 'login';
+  document.getElementById('screenUnauthorized').hidden = name !== 'unauthorized';
+  document.getElementById('screenAdmin').hidden = name !== 'admin';
+  document.getElementById('signOutBtn').hidden = name === 'login';
+}
+
+async function handleSession(session){
+  if(!session){
+    document.getElementById('whoami').textContent = 'Not signed in';
+    showScreen('login');
+    return;
+  }
+
+  const user = session.user;
+  const discordName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Signed in';
+  document.getElementById('whoami').textContent = discordName;
+
+  // Fresh Discord logins carry a one-time provider token — use it to check
+  // the Midnight role right now and self-register as admin if it's present.
+  if(session.provider_token){
+    try{
+      const hasRole = await checkMidnightRole(session.provider_token);
+      if(hasRole){
+        await sb.from('mc_admins').upsert({ user_id:user.id, note:'auto-granted via Midnight role' });
+      }
+    }catch(err){
+      console.warn('Could not verify the Midnight role right now.', err);
+    }
+  }
+
+  const { data: adminRow } = await sb.from('mc_admins').select('user_id').eq('user_id', user.id).maybeSingle();
+
+  if(!adminRow){
+    document.getElementById('grantSql').textContent = `insert into mc_admins (user_id) values ('${user.id}');`;
+    showScreen('unauthorized');
+    return;
+  }
+
+  showScreen('admin');
+  loadCatalogAdmin();
+  loadOrdersAdmin();
+}
+
+sb.auth.getSession().then(({ data:{ session } }) => handleSession(session));
+sb.auth.onAuthStateChange((_event, session) => handleSession(session));
+
+// ---------- Tabs ----------
+document.querySelectorAll('[data-stub]').forEach(stub => {
+  stub.addEventListener('click', () => {
+    const which = stub.getAttribute('data-stub');
+    document.getElementById('view-catalog').hidden = which !== 'catalog';
+    document.getElementById('view-orders').hidden = which !== 'orders';
+    document.querySelectorAll('[data-stub]').forEach(b => b.setAttribute('aria-selected', String(b === stub)));
+  });
+});
+
+// ---------- Catalog management ----------
+async function loadCatalogAdmin(){
+  const container = document.getElementById('catalogGroups');
+  container.innerHTML = '<div class="empty-note">Loading catalog…</div>';
+
+  const { data, error } = await sb.from('mc_catalog_items').select('*').order('bin').order('sort_order');
+  if(error){
+    container.innerHTML = '<div class="empty-note">Could not load catalog.</div>';
+    console.error(error);
+    return;
+  }
+
+  const grouped = {};
+  BIN_ORDER.forEach(b => grouped[b] = []);
+  data.forEach(row => { if(grouped[row.bin]) grouped[row.bin].push(row); else (grouped[row.bin] = grouped[row.bin] || []).push(row); });
+
+  container.innerHTML = BIN_ORDER.map(bin => {
+    const items = grouped[bin] || [];
+    return `
+      <div class="bin-group">
+        <h3>${BIN_LABELS[bin] || bin} <span style="color:var(--dim);font-weight:400">(${items.length})</span></h3>
+        ${items.map(item => `
+          <div class="item-row" data-row="${item.id}">
+            <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
+            <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="custom" data-field="price" />
+            <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
+            <button class="action" data-save="${item.id}">Save</button>
+            <button class="action action--danger" data-delete="${item.id}">Delete</button>
+          </div>`).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-save]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-save');
+      const row = container.querySelector(`[data-row="${cssEscape(id)}"]`);
+      const name = row.querySelector('[data-field="name"]').value.trim();
+      const priceRaw = row.querySelector('[data-field="price"]').value;
+      const sortOrder = Number(row.querySelector('[data-field="sort_order"]').value) || 0;
+
+      if(!name){ flashAlert('Name cannot be empty.'); return; }
+
+      const { error } = await sb.from('mc_catalog_items').update({
+        name,
+        price: priceRaw === '' ? null : Number(priceRaw),
+        sort_order: sortOrder
+      }).eq('id', id);
+
+      if(error){ flashAlert('Save failed: ' + error.message); return; }
+      flashAlert(`${name} saved.`, 'Saved');
+    });
+  });
+
+  container.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-delete');
+      flashConfirm(`Delete "${id}" from the catalog? This cannot be undone.`, async () => {
+        const { error } = await sb.from('mc_catalog_items').delete().eq('id', id);
+        if(error){ flashAlert('Delete failed: ' + error.message); return; }
+        loadCatalogAdmin();
+      }, 'Delete Item?');
+    });
+  });
+}
+
+document.getElementById('addItemBtn').addEventListener('click', async () => {
+  const bin = document.getElementById('newBin').value;
+  const id = document.getElementById('newId').value.trim();
+  const name = document.getElementById('newName').value.trim();
+  const priceRaw = document.getElementById('newPrice').value;
+
+  if(!id || !name){ flashAlert('ID and Name are both required.'); return; }
+
+  const type = bin === 'parts' ? 'part' : bin === 'cosmetics' ? 'cos' : 'perf';
+  const category = (bin === 'parts' || bin === 'cosmetics') ? null : bin;
+
+  const { error } = await sb.from('mc_catalog_items').insert({
+    id, name, bin, type, category,
+    price: priceRaw === '' ? null : Number(priceRaw),
+    sort_order: 999
+  });
+
+  if(error){ flashAlert('Add failed: ' + error.message); return; }
+
+  document.getElementById('newId').value = '';
+  document.getElementById('newName').value = '';
+  document.getElementById('newPrice').value = '';
+  flashAlert(`${name} added to ${BIN_LABELS[bin]}.`, 'Added');
+  loadCatalogAdmin();
+});
+
+// ---------- Orders ----------
+async function loadOrdersAdmin(){
+  const list = document.getElementById('ordersList');
+  list.innerHTML = '<div class="empty-note">Loading orders…</div>';
+
+  const { data, error } = await sb.from('mc_orders').select('*').order('created_at', { ascending:false }).limit(200);
+  if(error){
+    list.innerHTML = '<div class="empty-note">Could not load orders.</div>';
+    console.error(error);
+    return;
+  }
+
+  if(!data.length){
+    list.innerHTML = '<div class="empty-note">No orders yet.</div>';
+    return;
+  }
+
+  list.innerHTML = data.map(o => `
+    <div class="order-entry">
+      <div class="head">
+        <div>
+          <strong>${new Date(o.created_at).toLocaleString()}</strong>
+          <div class="meta">${o.items.length} line${o.items.length===1?'':'s'} • ${o.discount_pct}% off • Fee ${money(o.shop_fee)}</div>
+        </div>
+        <div class="amount">${money(o.total)}</div>
+      </div>
+      <details>
+        <summary>Line items</summary>
+        <ul>
+          ${o.items.map(i => `<li>${i.qty}× ${i.name}${i.meta ? ` (${i.meta})` : ''} — ${money(i.unit * i.qty)}</li>`).join('')}
+        </ul>
+      </details>
+      <div class="row-actions">
+        <button class="action action--danger" data-strike="${o.id}">Delete</button>
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('[data-strike]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-strike');
+      flashConfirm('Delete this order from history? This cannot be undone.', async () => {
+        const { error } = await sb.from('mc_orders').delete().eq('id', id);
+        if(error){ flashAlert('Delete failed: ' + error.message); return; }
+        loadOrdersAdmin();
+      }, 'Delete Order?');
+    });
+  });
+}
+
+// ---------- Small helpers ----------
+function escapeAttr(str){
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function cssEscape(str){
+  return String(str).replace(/(["\\])/g,'\\$1');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Midnight Club Order Calculator</title>
+
+<link rel="icon" type="image/png" sizes="32x32" href="https://i.ibb.co/Df33fVRN/MC.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://i.ibb.co/Df33fVRN/MC.png">
+<link rel="apple-touch-icon" href="https://i.ibb.co/Df33fVRN/MC.png">
+<meta name="theme-color" content="#130f1f">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --carbon:#130f1f;
+    --gunmetal:#1b1531;
+    --plate:#241c40;
+    --steel:#4c3d74;
+    --steel-soft:#2d2452;
+    --ink:#f1ecfc;
+    --dim:#a99bcf;
+    --amber:#ffb020;
+    --amber-dim:#5a4415;
+    --redline:#ff3b3b;
+    --radius:10px;
+    --font-display:'Rajdhani',sans-serif;
+    --font-body:'IBM Plex Sans',ui-sans-serif,system-ui,Arial;
+    --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+
+  [data-theme="light"]{
+    --carbon:#f3eefc;
+    --gunmetal:#faf7ff;
+    --plate:#ffffff;
+    --steel:#d8cdef;
+    --steel-soft:#ece3fa;
+    --ink:#241a3d;
+    --dim:#7c6a9c;
+    --amber-dim:#ffe3ad;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      repeating-linear-gradient(115deg, rgba(255,255,255,.015) 0 2px, transparent 2px 4px),
+      var(--carbon);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3{margin:0}
+
+  .desk-wrap{max-width:1240px;margin:0 auto;padding:22px 18px 60px}
+
+  /* ---------- Marquee header ---------- */
+  .marquee{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:var(--gunmetal);
+    border:1px solid var(--steel);
+    border-radius:var(--radius);
+    padding:16px 20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .marquee::before{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
+    background:repeating-linear-gradient(115deg,var(--amber) 0 14px,var(--carbon) 14px 28px);
+  }
+  .badge{display:flex;align-items:center;gap:14px}
+  .crest{
+    width:46px;height:46px;border-radius:8px;flex:none;
+    background:var(--plate);border:1px solid var(--steel);
+    display:grid;place-items:center;font-size:22px;
+  }
+  .badge h1{
+    font-family:var(--font-display);
+    font-size:1.35rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  }
+  .badge .sub{color:var(--dim);font-size:.82rem;margin-top:2px}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+  .action{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:10px 16px;border-radius:8px;border:1px solid var(--steel);
+    background:var(--steel-soft);color:var(--ink);cursor:pointer;
+    font-family:var(--font-display);font-weight:600;letter-spacing:.02em;text-transform:uppercase;font-size:.88rem;
+  }
+  .action:hover{border-color:var(--amber)}
+  .action--primary{background:var(--amber);border-color:var(--amber);color:#1a1200}
+  .action--primary:hover{filter:brightness(1.06)}
+  .action--danger{color:var(--redline);border-color:var(--redline)}
+  .action--danger:hover{background:var(--redline);color:#fff}
+  .action--block{width:100%}
+
+  /* ---------- Desk layout ---------- */
+  .desk{display:grid;grid-template-columns:1.35fr .9fr;gap:20px;margin-top:20px}
+  @media (max-width:960px){.desk{grid-template-columns:1fr}}
+
+  .plate-panel{
+    background:var(--gunmetal);border:1px solid var(--steel);border-radius:var(--radius);
+  }
+  .plate-panel > h2{
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;font-size:1rem;
+    padding:14px 18px;border-bottom:1px solid var(--steel);color:var(--dim);
+  }
+  .plate-panel > h2 b{color:var(--ink)}
+  .plate-body{padding:14px}
+
+  /* ---------- Catalog bins (details/summary) ---------- */
+  .bin{border:1px solid var(--steel);border-radius:8px;margin-bottom:10px;background:var(--plate);overflow:hidden}
+  .bin:last-child{margin-bottom:0}
+  .bin > summary{
+    list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:8px;
+    font-family:var(--font-display);font-weight:600;letter-spacing:.02em;text-transform:uppercase;font-size:.95rem;
+  }
+  .bin > summary::-webkit-details-marker{display:none}
+  .bin > summary::after{content:"+";color:var(--amber);font-size:1.1rem;font-family:var(--font-body)}
+  .bin[open] > summary::after{content:"–"}
+  .bin > summary .bin-title{flex:1}
+  .bin > summary .count{color:var(--dim);font-family:var(--font-mono);font-size:.75rem;text-transform:none;font-weight:400;flex:none;min-width:44px;text-align:right}
+
+  /* ---------- Parts & Body pill buttons ---------- */
+  .pill-bin{display:flex;flex-wrap:wrap;gap:10px;padding:0 14px 14px}
+  .part-pill{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:10px 16px;border-radius:999px;text-align:center;white-space:nowrap;
+    background:var(--steel-soft);border:1px solid var(--steel);color:var(--ink);
+    font-family:var(--font-body);font-weight:500;font-size:.88rem;
+    cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;
+  }
+  .part-pill:hover{border-color:var(--amber);color:var(--amber)}
+  .part-pill:active{background:var(--amber-dim)}
+  .part-pill.selected{background:var(--amber);border-color:var(--amber);color:var(--carbon);font-weight:600}
+  .part-pill.selected:hover{color:var(--carbon)}
+
+  /* ---------- Performance sub-groups (merged bin) ---------- */
+  .perf-group{padding:0 14px}
+  .perf-group:first-of-type{padding-top:0}
+  .perf-group + .perf-group{margin-top:4px}
+  .perf-label{
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.06em;
+    font-size:.75rem;color:var(--amber);padding:8px 0 6px;
+    border-bottom:1px solid var(--steel-soft);margin-bottom:10px;
+  }
+  .perf-group .pill-bin{padding:0 0 14px}
+
+  .stepper{display:grid;grid-template-columns:30px 1fr 30px;align-items:center;gap:6px}
+  .stepper button{
+    height:30px;border-radius:6px;border:1px solid var(--steel);background:var(--plate);
+    color:var(--ink);cursor:pointer;font-size:16px;font-family:var(--font-body);
+  }
+  .stepper output{text-align:center;font-family:var(--font-mono);font-weight:600}
+
+  /* ---------- Work order ticket ---------- */
+  .stubs{display:flex;gap:6px;padding:12px 14px 0}
+  .stub{
+    flex:1;text-align:center;padding:10px;border-radius:6px 6px 0 0;
+    background:var(--steel-soft);border:1px solid var(--steel);border-bottom:none;
+    font-family:var(--font-display);font-weight:600;letter-spacing:.03em;text-transform:uppercase;font-size:.85rem;
+    color:var(--dim);cursor:pointer;
+  }
+  .stub[aria-selected="true"]{color:var(--amber);background:var(--plate)}
+
+  .ticket{
+    margin:0 14px 14px;border:1px dashed var(--steel);border-top:none;border-radius:0 0 8px 8px;
+    background:var(--plate);
+  }
+  .ticket-line{
+    display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;
+    padding:10px 14px;border-bottom:1px dashed var(--steel);font-family:var(--font-mono);font-size:.88rem;
+  }
+  .ticket-line:last-child{border-bottom:none}
+  .ticket-empty{padding:22px 14px;color:var(--dim);font-family:var(--font-mono);font-size:.85rem;text-align:center}
+
+  /* ---------- Torque dial (discount) ---------- */
+  .dial{padding:14px;border-top:1px solid var(--steel)}
+  .dial-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .dial-head label{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;font-size:.85rem;color:var(--dim)}
+  .dial-readout{
+    font-family:var(--font-mono);font-weight:600;color:var(--amber);
+    border:1px solid var(--amber-dim);border-radius:6px;padding:3px 9px;font-size:.85rem;
+  }
+  .dial input[type="range"]{
+    width:100%;accent-color:var(--amber);
+  }
+
+  /* ---------- Gauge total readout (signature element) ---------- */
+  .totals{padding:14px;display:flex;flex-direction:column;gap:8px}
+  .totals__row{display:flex;justify-content:space-between;align-items:center;font-size:.9rem;color:var(--dim)}
+  .totals__row strong{color:var(--ink);font-family:var(--font-mono);font-weight:500}
+  .totals__row.fee strong{color:var(--amber)}
+
+  .gauge{
+    margin-top:6px;border:1px solid var(--steel);border-radius:8px;background:var(--carbon);
+    padding:14px 16px;position:relative;
+  }
+  .gauge::before,.gauge::after{
+    content:"";position:absolute;top:6px;width:6px;height:6px;border-radius:50%;
+    background:var(--steel);box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);
+  }
+  .gauge::before{left:6px}
+  .gauge::after{right:6px}
+  .gauge-label{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;font-size:.72rem;color:var(--dim)}
+  .gauge-value{
+    font-family:var(--font-mono);font-weight:600;font-size:2.1rem;color:var(--amber);
+    text-shadow:0 0 14px rgba(255,176,32,.45);letter-spacing:.02em;
+    transition:text-shadow .25s ease;
+  }
+
+  .order-actions{padding:0 14px 14px;display:flex;flex-direction:column;gap:8px}
+
+  /* ---------- Ledger (history) ---------- */
+  .ledger{padding:14px;display:flex;flex-direction:column;gap:10px}
+  .ledger-empty{color:var(--dim);font-family:var(--font-mono);font-size:.85rem;text-align:center;padding:20px 0}
+  .ledger-entry{border:1px solid var(--steel);border-radius:8px;background:var(--plate);padding:12px}
+  .ledger-entry .head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .ledger-entry .head strong{font-family:var(--font-mono);font-size:.85rem}
+  .ledger-entry .meta{color:var(--dim);font-size:.78rem;margin-top:3px;font-family:var(--font-mono)}
+  .ledger-entry .amount{font-family:var(--font-mono);font-weight:600;color:var(--amber)}
+  .ledger-entry details{margin-top:8px;color:var(--dim);font-size:.82rem}
+  .ledger-entry summary{cursor:pointer}
+  .ledger-entry ul{margin:6px 0 0 16px;padding:0}
+  .ledger-entry .row-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+
+  /* ---------- Slips (dialogs) ---------- */
+  dialog{
+    width:min(460px,92vw);border:1px solid var(--steel);background:var(--gunmetal);color:var(--ink);
+    border-radius:10px;padding:0;box-shadow:0 30px 70px rgba(0,0,0,.6);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  .slip-head{
+    display:flex;justify-content:space-between;align-items:center;padding:14px 16px;
+    border-bottom:1px solid var(--steel);
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;font-size:.95rem;
+  }
+  .slip-body{padding:16px;display:grid;gap:12px}
+  .slip-body label{font-size:.82rem;color:var(--dim)}
+  .slip-body input{
+    background:var(--plate);border:1px solid var(--steel);border-radius:8px;padding:10px 12px;
+    color:var(--ink);font-family:var(--font-mono);
+  }
+  .slip-warning{color:var(--redline);font-size:.8rem;display:none}
+  .slip-actions{display:flex;justify-content:flex-end;gap:10px}
+
+  @media (prefers-reduced-motion: reduce){
+    .gauge-value{transition:none}
+  }
+</style>
+</head>
+
+<body>
+  <div class="desk-wrap">
+
+    <header class="marquee">
+      <div class="badge">
+        <div class="crest" aria-hidden="true">🏁</div>
+        <div>
+          <h1>Midnight Club — Night Garage</h1>
+          <div class="sub">Work-order desk: pick upgrades, set custom prices, dial in a discount.</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="action" id="lightsBtn" aria-pressed="true">☀️ Lights On</button>
+      </div>
+    </header>
+
+    <div class="desk">
+      <!-- ===== CATALOG ===== -->
+      <section class="plate-panel">
+        <h2>Parts <b>Catalog</b></h2>
+        <div class="plate-body">
+
+          <details class="bin" open>
+            <summary><span class="bin-title">Performance</span> <span class="count" id="count-performance"></span></summary>
+
+            <div class="perf-group">
+              <div class="perf-label">Engine</div>
+              <div class="pill-bin" id="bin-engine"></div>
+            </div>
+
+            <div class="perf-group">
+              <div class="perf-label">Brakes</div>
+              <div class="pill-bin" id="bin-brakes"></div>
+            </div>
+
+            <div class="perf-group">
+              <div class="perf-label">Suspension</div>
+              <div class="pill-bin" id="bin-susp"></div>
+            </div>
+
+            <div class="perf-group">
+              <div class="perf-label">Transmission</div>
+              <div class="pill-bin" id="bin-trans"></div>
+            </div>
+
+            <div class="perf-group">
+              <div class="perf-label">Armor</div>
+              <div class="pill-bin" id="bin-armor"></div>
+            </div>
+
+            <div class="perf-group">
+              <div class="perf-label">Turbo</div>
+              <div class="pill-bin" id="bin-turbo"></div>
+            </div>
+          </details>
+
+          <details class="bin">
+            <summary><span class="bin-title">Parts &amp; Body</span> <span class="count" id="count-parts"></span></summary>
+            <div class="pill-bin" id="bin-parts"></div>
+          </details>
+
+          <details class="bin">
+            <summary><span class="bin-title">Cosmetic Upgrades</span> <span class="count" id="count-cosmetics"></span></summary>
+            <div class="pill-bin" id="bin-cosmetics"></div>
+          </details>
+
+        </div>
+      </section>
+
+      <!-- ===== WORK ORDER ===== -->
+      <aside class="plate-panel">
+        <h2>Work <b>Order</b></h2>
+
+        <div class="stubs" role="tablist">
+          <div class="stub" data-stub="order" aria-selected="true">🧾 Order</div>
+          <div class="stub" data-stub="ledger" aria-selected="false">📜 Ledger</div>
+        </div>
+
+        <div id="view-order" role="tabpanel">
+          <div class="ticket" id="ticketBody">
+            <div class="ticket-empty">No parts on the ticket yet. Add items from the catalog.</div>
+          </div>
+
+          <div class="dial">
+            <div class="dial-head">
+              <label for="dialRange">Shop Discount</label>
+              <span class="dial-readout" id="dialReadout">0%</span>
+            </div>
+            <input id="dialRange" type="range" min="0" max="100" step="5" value="0"/>
+          </div>
+
+          <div class="totals">
+            <div class="totals__row"><span>Subtotal</span><strong id="sumSubtotal">$0.00</strong></div>
+            <div class="totals__row"><span>Discount</span><strong id="sumDiscount">-$0.00</strong></div>
+            <div class="totals__row fee"><span>Shop Fee 20% <span style="color:var(--dim)">(non-perf only)</span></span><strong id="sumFee">$0.00</strong></div>
+
+            <div class="gauge">
+              <div class="gauge-label">Total Due</div>
+              <div class="gauge-value" id="sumTotal">$0.00</div>
+            </div>
+          </div>
+
+          <div class="order-actions">
+            <button class="action action--primary action--block" id="closeOrderBtnAside">Checkout</button>
+            <button class="action action--danger action--block" id="voidOrderBtnAside">Clear Order</button>
+          </div>
+        </div>
+
+        <div id="view-ledger" role="tabpanel" hidden>
+          <div class="ledger" id="ledgerList"></div>
+          <div class="order-actions" style="padding-top:0">
+            <button class="action action--danger action--block" id="ledgerClearBtn">Clear Ledger</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== SLIPS (dialogs) ===== -->
+  <dialog id="slipPrice">
+    <div class="slip-head"><span>Set Price</span><button class="action" id="slipPriceClose">✕</button></div>
+    <div class="slip-body">
+      <label for="slipPriceInput">Unit Price ($)</label>
+      <input id="slipPriceInput" type="number" min="0" step="25" value="0"/>
+      <small class="slip-warning" id="slipPriceWarning">⚠ Enter a price greater than $0.</small>
+      <div class="slip-actions">
+        <button class="action" id="slipPriceCancel">Cancel</button>
+        <button class="action action--primary" id="slipPriceAdd">Add to Ticket</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="slipAlert">
+    <div class="slip-head"><span id="slipAlertTitle">Notice</span><button class="action" id="slipAlertClose">✕</button></div>
+    <div class="slip-body">
+      <div id="slipAlertMessage"></div>
+      <div class="slip-actions"><button class="action action--primary" id="slipAlertOk">OK</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="slipConfirm">
+    <div class="slip-head"><span id="slipConfirmTitle">Please Confirm</span><button class="action" id="slipConfirmClose">✕</button></div>
+    <div class="slip-body">
+      <div id="slipConfirmMessage"></div>
+      <div class="slip-actions">
+        <button class="action" id="slipConfirmCancel">Cancel</button>
+        <button class="action action--primary" id="slipConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+<script>
+// ---------- Catalog data (fallback used only if Supabase is unreachable) ----------
+const FALLBACK_CATALOG = {
+  parts: [
+    { id:'spoiler', name:'🧩 Spoiler', price:null, type:'part' },
+    { id:'skirts', name:'🧩 Skirts', price:null, type:'part' },
+    { id:'exhausts', name:'💨 Exhausts', price:null, type:'part' },
+    { id:'hood', name:'🛡️ Hood', price:null, type:'part' },
+    { id:'bodykits', name:'🧱 Body Kits', price:null, type:'part' },
+    { id:'roof', name:'🏁 Roof', price:null, type:'part' },
+    { id:'grill', name:'🧩 Grill', price:null, type:'part' },
+    { id:'framekits', name:'🧬 Frame Kits', price:null, type:'part' },
+    { id:'plate', name:'🔖 Plate', price:null, type:'part' },
+    { id:'liveries', name:'🎨 Liveries', price:null, type:'part' },
+    { id:'front-bumper', name:'🧩 Front Bumper', price:null, type:'part' },
+    { id:'rear-bumper', name:'🧩 Rear Bumper', price:null, type:'part' },
+    { id:'lights', name:'💡 Lights', price:null, type:'part' },
+    { id:'lights-color', name:'🌈 Lights Color', price:null, type:'part' },
+    { id:'neon-layout', name:'✨ Neon Layout', price:null, type:'part' },
+    { id:'neon-color', name:'💜 Neon Color', price:null, type:'part' },
+    { id:'primary-paint', name:'🎨 Primary Respray', price:null, type:'part' },
+    { id:'secondary-paint', name:'🎨 Secondary Respray', price:null, type:'part' },
+    { id:'pearlescent', name:'🌌 Pearlescent', price:null, type:'part' },
+    { id:'systems', name:'🧠 Systems', price:null, type:'part' },
+    { id:'windows', name:'🧊 Windows', price:null, type:'part' },
+    { id:'wheel-color', name:'🎡 Wheel Color', price:null, type:'part' },
+    { id:'wheel-accessory', name:'🔩 Wheel Accessory', price:null, type:'part' }
+  ],
+
+  cosmetics: [
+    { id:'arch-cover', name:'🧭 Arch Cover', price:null, type:'cos' },
+    { id:'aerials', name:'📡 Aerials', price:null, type:'cos' },
+    { id:'roof-scoops', name:'🧩 Roof Scoops', price:null, type:'cos' },
+    { id:'roll-cage', name:'🦺 Roll Cage', price:null, type:'cos' },
+    { id:'interior', name:'🛋️ Interior Color', price:null, type:'cos' },
+    { id:'trim', name:'🧵 Trim Design', price:null, type:'cos' },
+    { id:'dashboard', name:'📟 Dashboard', price:null, type:'cos' },
+    { id:'doors', name:'🚪 Doors', price:null, type:'cos' },
+    { id:'seats', name:'🪑 Seats', price:null, type:'cos' },
+    { id:'steering', name:'🕹️ Steering Wheel', price:null, type:'cos' },
+    { id:'engine-block', name:'🧊 Engine Block', price:null, type:'cos' },
+    { id:'cam-cover', name:'🎛️ Cam Cover', price:null, type:'cos' },
+    { id:'strut-brace', name:'🦾 Strut Brace', price:null, type:'cos' }
+  ],
+
+  performance: {
+    brakes: [
+      { id:'brk-street', name:'🛑 Brakes: Street', price:1950, type:'perf', category:'brakes' },
+      { id:'brk-sport', name:'🏎️ Brakes: Sport', price:2900, type:'perf', category:'brakes' },
+      { id:'brk-race', name:'🏁 Brakes: Race', price:3800, type:'perf', category:'brakes' }
+    ],
+    suspension: [
+      { id:'sus-lowered', name:'⬇️ Suspension: Lowered', price:950, type:'perf', category:'suspension' },
+      { id:'sus-street', name:'🚧 Suspension: Street', price:1900, type:'perf', category:'suspension' },
+      { id:'sus-sport', name:'🏎️ Suspension: Sport', price:3350, type:'perf', category:'suspension' },
+      { id:'sus-comp', name:'🎯 Suspension: Competition', price:3850, type:'perf', category:'suspension' }
+    ],
+    transmission: [
+      { id:'trn-street', name:'⚙️ Transmission: Street', price:950, type:'perf', category:'transmission' },
+      { id:'trn-sport', name:'⚙️ Transmission: Sport', price:1200, type:'perf', category:'transmission' },
+      { id:'trn-race', name:'⚙️ Transmission: Race', price:1450, type:'perf', category:'transmission' }
+    ],
+    armor: [
+      { id:'arm-20', name:'🛡️ Armor 20%', price:950, type:'perf', category:'armor' },
+      { id:'arm-40', name:'🛡️ Armor 40%', price:2900, type:'perf', category:'armor' },
+      { id:'arm-60', name:'🛡️ Armor 60%', price:3850, type:'perf', category:'armor' },
+      { id:'arm-80', name:'🛡️ Armor 80%', price:4850, type:'perf', category:'armor' },
+      { id:'arm-100', name:'🛡️ Armor 100%', price:7250, type:'perf', category:'armor' }
+    ],
+    turbo: [
+      { id:'turbo', name:'🌬️ Turbo Tuning', price:5750, type:'perf', category:'turbo' }
+    ],
+    engine: [
+      { id:'ems-l2', name:'🔧 Engine (EMS L2)', price:2400, type:'perf', category:'engine' },
+      { id:'ems-l3', name:'🔧 Engine (EMS L3)', price:3400, type:'perf', category:'engine' },
+      { id:'ems-l4', name:'🔧 Engine (EMS L4)', price:4750, type:'perf', category:'engine' },
+      { id:'ems-l5', name:'🔧 Engine (EMS L5)', price:12000, type:'perf', category:'engine' }
+    ]
+  }
+};
+
+const money = n => '$' + Number(n).toFixed(2);
+
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://gpaqlehknskrcthyaapo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwYXFsZWhrbnNrcmN0aHlhYXBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NjQwMjEsImV4cCI6MjA5ODI0MDAyMX0.pVsGNoYVNsh6w0RTTCajtveVJ12wgxxgP1Vqhl2EOxQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const PERF_BINS = ['brakes','suspension','transmission','armor','turbo','engine'];
+
+let CATALOG = FALLBACK_CATALOG;
+
+async function loadCatalog(){
+  try{
+    const { data, error } = await sb.from('mc_catalog_items').select('*').order('bin').order('sort_order');
+    if(error || !data || !data.length) throw error || new Error('empty catalog');
+
+    const grouped = { parts:[], cosmetics:[], performance:{ brakes:[], suspension:[], transmission:[], armor:[], turbo:[], engine:[] } };
+    data.forEach(row => {
+      const item = { id:row.id, name:row.name, price:row.price, type:row.type, category:row.category || undefined };
+      if(row.bin === 'parts') grouped.parts.push(item);
+      else if(row.bin === 'cosmetics') grouped.cosmetics.push(item);
+      else if(grouped.performance[row.bin]) grouped.performance[row.bin].push(item);
+    });
+    CATALOG = grouped;
+  }catch(err){
+    console.warn('Could not load catalog from Supabase, using built-in fallback.', err);
+    CATALOG = FALLBACK_CATALOG;
+  }
+}
+
+async function pushOrderRemote(entry){
+  try{
+    await sb.from('mc_orders').insert({
+      items: entry.items,
+      discount_pct: entry.pct,
+      subtotal: entry.subtotal,
+      discount: entry.discount,
+      shop_fee: entry.shopFee,
+      total: entry.total
+    });
+  }catch(err){
+    console.warn('Order sync to Supabase failed (order is still saved locally).', err);
+  }
+}
+
+// ---------- Persisted desk state (same storage keys as before, so existing saved tickets/history carry over) ----------
+const STATE_KEY = 'mc_state_v4_sw';
+const HIST_KEY = 'mc_hist_v4_sw';
+const desk = { ticket:[], discountPct:0, ledger:[] };
+
+try{
+  const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+  const h = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+  if(Array.isArray(s.cart)) desk.ticket = s.cart;
+  if(typeof s.discountPct === 'number') desk.discountPct = s.discountPct;
+  if(Array.isArray(h)) desk.ledger = h;
+}catch{}
+
+const saveDesk = () => localStorage.setItem(STATE_KEY, JSON.stringify({ cart:desk.ticket, discountPct:desk.discountPct }));
+const saveLedger = () => localStorage.setItem(HIST_KEY, JSON.stringify(desk.ledger));
+
+// ---------- Slips: alert / confirm (replace blocking browser popups) ----------
+const slipAlert = document.getElementById('slipAlert');
+const slipAlertTitle = document.getElementById('slipAlertTitle');
+const slipAlertMessage = document.getElementById('slipAlertMessage');
+
+function flashAlert(message, title = 'Notice'){
+  slipAlertTitle.textContent = title;
+  slipAlertMessage.textContent = message;
+  slipAlert.showModal();
+}
+document.getElementById('slipAlertClose').onclick = () => slipAlert.close();
+document.getElementById('slipAlertOk').onclick = () => slipAlert.close();
+
+const slipConfirm = document.getElementById('slipConfirm');
+const slipConfirmTitle = document.getElementById('slipConfirmTitle');
+const slipConfirmMessage = document.getElementById('slipConfirmMessage');
+let confirmCallback = null;
+
+function flashConfirm(message, onConfirm, title = 'Please Confirm'){
+  slipConfirmTitle.textContent = title;
+  slipConfirmMessage.textContent = message;
+  confirmCallback = onConfirm;
+  slipConfirm.showModal();
+}
+document.getElementById('slipConfirmClose').onclick = () => slipConfirm.close();
+document.getElementById('slipConfirmCancel').onclick = () => slipConfirm.close();
+document.getElementById('slipConfirmOk').onclick = () => {
+  slipConfirm.close();
+  if(typeof confirmCallback === 'function') confirmCallback();
+  confirmCallback = null;
+};
+
+// ---------- Catalog lookup helpers ----------
+function everyItem(){
+  return [
+    ...CATALOG.parts,
+    ...CATALOG.cosmetics,
+    ...CATALOG.performance.brakes,
+    ...CATALOG.performance.suspension,
+    ...CATALOG.performance.transmission,
+    ...CATALOG.performance.armor,
+    ...CATALOG.performance.turbo,
+    ...CATALOG.performance.engine
+  ];
+}
+function lookupItem(id){ return everyItem().find(i => i.id === id); }
+
+// ---------- Catalog rendering: pill buttons ----------
+function partPillHTML(item){
+  const action = item.price == null ? `data-quote="${item.id}"` : `data-stock="${item.id}"`;
+  const category = item.category ? ` data-category="${item.category}"` : '';
+  const label = item.price == null ? item.name : `${item.name} — ${money(item.price)}`;
+  return `<button class="part-pill" data-id="${item.id}" ${action}${category}>${label}</button>`;
+}
+
+function equalizePillWidths(el){
+  const pills = el.querySelectorAll('.part-pill');
+  if(!pills.length) return;
+  pills.forEach(p => { p.style.width = 'auto'; });
+  let max = 0;
+  pills.forEach(p => { max = Math.max(max, p.getBoundingClientRect().width); });
+  pills.forEach(p => { p.style.width = `${Math.ceil(max)}px`; });
+}
+
+function fillPillBin(items, mountId, countId){
+  const el = document.getElementById(mountId);
+  el.innerHTML = items.map(partPillHTML).join('');
+  if(countId){
+    const countEl = document.getElementById(countId);
+    if(countEl) countEl.textContent = `(${items.length})`;
+  }
+
+  el.querySelectorAll('.part-pill').forEach(btn => {
+    const stockId = btn.getAttribute('data-stock');
+    const quoteId = btn.getAttribute('data-quote');
+    const category = btn.getAttribute('data-category');
+
+    if(stockId){
+      const item = lookupItem(stockId);
+      btn.addEventListener('click', () => {
+        const alreadyOn = desk.ticket.some(l => l.id === item.id);
+
+        if(alreadyOn){
+          // Clicking the currently-selected pick again deselects it — no warning needed.
+          desk.ticket = desk.ticket.filter(l => l.id !== item.id);
+          saveDesk(); renderTicket(); renderGauge();
+          return;
+        }
+
+        const existing = category
+          ? desk.ticket.find(l => { const c = lookupItem(l.id); return c && c.category === category; })
+          : null;
+
+        if(existing){
+          const label = category.charAt(0).toUpperCase() + category.slice(1);
+          flashConfirm(
+            `You already have a ${label} upgrade in your ticket (${existing.name}). Replace it with ${item.name}?`,
+            () => {
+              desk.ticket = desk.ticket.filter(l => l.id !== existing.id);
+              addLine({ id:item.id, name:item.name, unitPrice:item.price, qty:1, type:item.type || 'part' });
+            },
+            'Already Selected'
+          );
+          return;
+        }
+
+        addLine({ id:item.id, name:item.name, unitPrice:item.price, qty:1, type:item.type || 'part' });
+      });
+    }
+    if(quoteId){
+      const item = lookupItem(quoteId);
+      btn.addEventListener('click', () => openPriceSlip(item, 1));
+    }
+  });
+
+  equalizePillWidths(el);
+}
+
+function syncPillSelectionStates(){
+  document.querySelectorAll('.part-pill[data-stock]').forEach(btn => {
+    const selected = desk.ticket.some(l => l.id === btn.getAttribute('data-stock'));
+    btn.classList.toggle('selected', selected);
+  });
+}
+
+function renderCatalog(){
+  fillPillBin(CATALOG.parts, 'bin-parts', 'count-parts');
+  fillPillBin(CATALOG.cosmetics, 'bin-cosmetics', 'count-cosmetics');
+  fillPillBin(CATALOG.performance.brakes, 'bin-brakes');
+  fillPillBin(CATALOG.performance.suspension, 'bin-susp');
+  fillPillBin(CATALOG.performance.transmission, 'bin-trans');
+  fillPillBin(CATALOG.performance.armor, 'bin-armor');
+  fillPillBin(CATALOG.performance.turbo, 'bin-turbo');
+  fillPillBin(CATALOG.performance.engine, 'bin-engine');
+
+  const perfTotal = CATALOG.performance.brakes.length + CATALOG.performance.suspension.length +
+    CATALOG.performance.transmission.length + CATALOG.performance.armor.length +
+    CATALOG.performance.turbo.length + CATALOG.performance.engine.length;
+  document.getElementById('count-performance').textContent = `(${perfTotal})`;
+}
+
+// ---------- Custom price slip ----------
+const priceSlip = document.getElementById('slipPrice');
+const priceSlipInput = document.getElementById('slipPriceInput');
+let priceSlipCtx = null;
+
+document.getElementById('slipPriceClose').onclick = () => priceSlip.close();
+document.getElementById('slipPriceCancel').onclick = () => priceSlip.close();
+
+function openPriceSlip(item, qty){
+  priceSlipCtx = {...item, qty};
+  document.querySelector('#slipPrice .slip-head span').textContent = `Set Price — ${item.name}`;
+  priceSlipInput.value = '';
+  document.getElementById('slipPriceWarning').style.display = 'none';
+  priceSlipInput.style.borderColor = '';
+  priceSlip.showModal();
+}
+
+document.getElementById('slipPriceAdd').onclick = () => {
+  if(!priceSlipCtx) return;
+  const v = Number(priceSlipInput.value);
+  const warning = document.getElementById('slipPriceWarning');
+
+  if(!Number.isFinite(v) || v <= 0){
+    warning.style.display = 'block';
+    priceSlipInput.style.borderColor = 'var(--redline)';
+    priceSlipInput.focus();
+    return;
+  }
+  warning.style.display = 'none';
+  priceSlipInput.style.borderColor = '';
+
+  addLine({
+    id:priceSlipCtx.id, name:priceSlipCtx.name, unitPrice:v,
+    qty:priceSlipCtx.qty || 1, type:priceSlipCtx.type || 'part', meta:'custom price'
+  });
+  priceSlip.close();
+};
+
+priceSlipInput.addEventListener('input', () => {
+  if(Number(priceSlipInput.value) > 0){
+    document.getElementById('slipPriceWarning').style.display = 'none';
+    priceSlipInput.style.borderColor = '';
+  }
+});
+
+// ---------- The ticket (cart) ----------
+function addLine(line){
+  const key = `${line.id}|${line.unitPrice}|${line.meta || ''}`;
+  const match = desk.ticket.find(l => `${l.id}|${l.unitPrice}|${l.meta || ''}` === key);
+
+  if(match) match.qty += line.qty;
+  else desk.ticket.push(line);
+
+  saveDesk();
+  renderTicket();
+  renderGauge();
+}
+
+function renderTicket(){
+  const box = document.getElementById('ticketBody');
+  syncPillSelectionStates();
+
+  if(!desk.ticket.length){
+    box.innerHTML = '<div class="ticket-empty">No parts on the ticket yet. Add items from the catalog.</div>';
+    return;
+  }
+
+  box.innerHTML = desk.ticket.map((l,i) => `
+    <div class="ticket-line">
+      <div>
+        <div style="font-family:var(--font-body);font-weight:500">${l.name}</div>
+        <div style="color:var(--dim);font-size:.78rem">${money(l.unitPrice)} each${l.meta ? ` • ${l.meta}` : ''}</div>
+      </div>
+      <div class="stepper">
+        <button data-less="${i}">−</button>
+        <output>${l.qty}</output>
+        <button data-more="${i}">+</button>
+      </div>
+      <div>${money(l.unitPrice * l.qty)}</div>
+    </div>`).join('');
+
+  box.querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.more;
+    desk.ticket[i].qty++;
+    saveDesk(); renderTicket(); renderGauge();
+  }));
+
+  box.querySelectorAll('[data-less]').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.less;
+    desk.ticket[i].qty--;
+    if(desk.ticket[i].qty <= 0) desk.ticket.splice(i, 1);
+    saveDesk(); renderTicket(); renderGauge();
+  }));
+}
+
+// ---------- Torque dial (discount) ----------
+const dialRange = document.getElementById('dialRange');
+const dialReadout = document.getElementById('dialReadout');
+
+function renderDial(){
+  dialRange.value = desk.discountPct;
+  dialReadout.textContent = `${desk.discountPct}%`;
+}
+
+dialRange.addEventListener('input', () => {
+  desk.discountPct = +dialRange.value;
+  saveDesk();
+  renderGauge();
+  renderDial();
+});
+
+// ---------- Totals math (unchanged: 20% shop fee on non-performance, after discount) ----------
+function computeTotals(){
+  const subtotal = desk.ticket.reduce((s,l) => s + l.unitPrice * l.qty, 0);
+  const discount = +(subtotal * (desk.discountPct / 100)).toFixed(2);
+
+  const nonPerfSubtotal = desk.ticket.filter(l => l.type !== 'perf').reduce((s,l) => s + l.unitPrice * l.qty, 0);
+  const perfSubtotal = desk.ticket.filter(l => l.type === 'perf').reduce((s,l) => s + l.unitPrice * l.qty, 0);
+
+  const nonPerfDiscount = nonPerfSubtotal * (desk.discountPct / 100);
+  const perfDiscount = perfSubtotal * (desk.discountPct / 100);
+
+  const nonPerfAfterDiscount = nonPerfSubtotal - nonPerfDiscount;
+  const perfAfterDiscount = perfSubtotal - perfDiscount;
+
+  const shopFee = +(nonPerfAfterDiscount * 0.20).toFixed(2);
+  const total = +(nonPerfAfterDiscount + perfAfterDiscount + shopFee).toFixed(2);
+
+  return { subtotal:+subtotal.toFixed(2), discount, shopFee, total };
+}
+
+function renderGauge(){
+  const t = computeTotals();
+  document.getElementById('sumSubtotal').textContent = money(t.subtotal);
+  document.getElementById('sumDiscount').textContent = '-' + money(t.discount);
+  document.getElementById('sumFee').textContent = money(t.shopFee);
+
+  const totalEl = document.getElementById('sumTotal');
+  totalEl.textContent = money(t.total);
+  totalEl.style.textShadow = '0 0 22px rgba(255,176,32,.75)';
+  requestAnimationFrame(() => { totalEl.style.textShadow = '0 0 14px rgba(255,176,32,.45)'; });
+}
+
+// ---------- Ledger (order history) ----------
+function renderLedger(){
+  const list = document.getElementById('ledgerList');
+
+  if(!desk.ledger.length){
+    list.innerHTML = '<div class="ledger-empty">No closed orders yet.</div>';
+    return;
+  }
+
+  list.innerHTML = desk.ledger.map(h => `
+    <div class="ledger-entry">
+      <div class="head">
+        <div>
+          <strong>${new Date(h.id).toLocaleString()}</strong>
+          <div class="meta">${h.items.length} line${h.items.length===1?'':'s'} • ${h.pct}% off • Fee ${money(h.shopFee || 0)}</div>
+        </div>
+        <div class="amount">${money(h.total)}</div>
+      </div>
+      <details>
+        <summary>Line items</summary>
+        <ul>
+          ${h.items.map(i => `<li>${i.qty}× ${i.name}${i.meta ? ` (${i.meta})` : ''} — ${money(i.unit * i.qty)}</li>`).join('')}
+        </ul>
+      </details>
+      <div class="row-actions">
+        <button class="action" data-reissue="${h.id}">Reissue</button>
+        <button class="action action--danger" data-strike="${h.id}">Delete</button>
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('[data-reissue]').forEach(b => b.addEventListener('click', () => {
+    const id = +b.dataset.reissue;
+    const h = desk.ledger.find(x => x.id === id);
+    if(!h) return;
+    h.items.forEach(it => addLine({
+      id:it.id, name:it.name, unitPrice:it.unit, qty:it.qty, type:it.type || 'part', meta:it.meta || null
+    }));
+  }));
+
+  list.querySelectorAll('[data-strike]').forEach(b => b.addEventListener('click', () => {
+    const id = +b.dataset.strike;
+    desk.ledger = desk.ledger.filter(x => x.id !== id);
+    saveLedger();
+    renderLedger();
+  }));
+}
+
+document.getElementById('ledgerClearBtn').addEventListener('click', () => {
+  if(!desk.ledger.length) return;
+  flashConfirm('This will permanently delete all closed-order history. This cannot be undone.', () => {
+    desk.ledger = [];
+    saveLedger();
+    renderLedger();
+  }, 'Clear All Ledger Entries?');
+});
+
+// ---------- Order/Ledger stub switcher ----------
+const stubButtons = document.querySelectorAll('[data-stub]');
+
+function selectStub(which){
+  document.getElementById('view-order').hidden = which !== 'order';
+  document.getElementById('view-ledger').hidden = which !== 'ledger';
+  stubButtons.forEach(b => b.setAttribute('aria-selected', String(b.getAttribute('data-stub') === which)));
+}
+stubButtons.forEach(b => b.addEventListener('click', () => selectStub(b.getAttribute('data-stub'))));
+
+// ---------- Close order (checkout) / Void order (reset) ----------
+function closeOrder(){
+  if(!desk.ticket.length){
+    flashAlert('The ticket is empty. Add parts before closing the order.');
+    return;
+  }
+
+  const t = computeTotals();
+  const entry = {
+    id:Date.now(),
+    items:desk.ticket.map(l => ({ id:l.id, name:l.name, qty:l.qty, unit:l.unitPrice, meta:l.meta || null, type:l.type || 'part' })),
+    pct:desk.discountPct,
+    subtotal:t.subtotal,
+    discount:t.discount,
+    shopFee:t.shopFee,
+    total:t.total
+  };
+
+  desk.ledger.unshift(entry);
+  saveLedger();
+  pushOrderRemote(entry);
+
+  desk.ticket = [];
+  desk.discountPct = 0;
+  saveDesk();
+
+  renderAll();
+  selectStub('order');
+  flashAlert(`Order Total ${money(t.total)} has been closed out.`, 'Order Closed');
+}
+
+function voidOrder(){
+  if(!desk.ticket.length) return;
+  flashConfirm('This will remove every part on the current ticket. This cannot be undone.', () => {
+    desk.ticket = [];
+    desk.discountPct = 0;
+    saveDesk();
+    renderAll();
+  }, 'Clear Current Order?');
+}
+
+document.getElementById('closeOrderBtnAside').addEventListener('click', closeOrder);
+document.getElementById('voidOrderBtnAside').addEventListener('click', voidOrder);
+
+// ---------- Lights (theme) toggle ----------
+const lightsBtn = document.getElementById('lightsBtn');
+
+function setLights(mode){
+  document.documentElement.setAttribute('data-theme', mode);
+  localStorage.setItem('mc_theme', mode);
+  lightsBtn.textContent = mode === 'light' ? '🌙 Lights Off' : '☀️ Lights On';
+  lightsBtn.setAttribute('aria-pressed', String(mode !== 'light'));
+}
+
+setLights(localStorage.getItem('mc_theme') || 'dark');
+
+lightsBtn.addEventListener('click', () => {
+  setLights((localStorage.getItem('mc_theme') || 'dark') === 'dark' ? 'light' : 'dark');
+});
+
+// ---------- Init ----------
+function renderAll(){
+  renderCatalog();
+  renderTicket();
+  renderGauge();
+  renderDial();
+  renderLedger();
+}
+
+(async function boot(){
+  await loadCatalog();
+  renderAll();
+})();
+</script>
+</body>
+</html>
