@@ -141,9 +141,19 @@
   .item-row input[type="number"]{font-family:var(--font-mono)}
   .item-row .id-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--dim)}
 
+  .item-row--perf{grid-template-columns:1fr 90px 90px 90px 60px auto auto}
+  .item-row--perf.item-row--head{
+    padding:0 0 6px;border-bottom:none;color:var(--dim);font-size:.7rem;
+    text-transform:uppercase;letter-spacing:.04em;font-family:var(--font-mono);
+  }
+  .profit-tag{
+    font-family:var(--font-mono);font-size:.85rem;text-align:center;padding:8px 6px;
+    color:var(--amber);white-space:nowrap;
+  }
+
   .add-form{
     margin-top:16px;padding-top:16px;border-top:1px dashed var(--steel);
-    display:grid;grid-template-columns:1fr 1fr 1fr 120px auto;gap:8px;align-items:end;
+    display:grid;grid-template-columns:1fr 1fr 1fr 100px 100px auto;gap:8px;align-items:end;
   }
   .add-form label{font-size:.72rem;color:var(--dim);display:block;margin-bottom:4px}
   .add-form input,.add-form select{
@@ -246,6 +256,10 @@
               <label>Price (blank = custom)</label>
               <input id="newPrice" type="number" min="0" step="25" placeholder="—" />
             </div>
+            <div>
+              <label>Cost (optional)</label>
+              <input id="newCost" type="number" min="0" step="25" placeholder="—" />
+            </div>
             <button class="action action--primary" id="addItemBtn">Add Item</button>
           </div>
         </div>
@@ -301,6 +315,10 @@ const PERF_ORDER = ['engine','brakes','suspension','transmission','armor','turbo
 const TOP_BIN_ORDER = ['parts','cosmetics'];
 const BIN_ORDER = [...TOP_BIN_ORDER, ...PERF_ORDER];
 const money = n => n == null ? '—' : '$' + Number(n).toFixed(2);
+function formatProfit(price, cost){
+  if(price == null || cost == null) return '—';
+  return money(price - cost);
+}
 
 // ---------- Alert / confirm dialogs ----------
 const slipAlert = document.getElementById('slipAlert');
@@ -467,6 +485,17 @@ async function loadCatalogAdmin(){
       <button class="action action--danger" data-delete="${item.id}">Delete</button>
     </div>`;
 
+  const perfItemRow = item => `
+    <div class="item-row item-row--perf" data-row="${item.id}">
+      <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
+      <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="price" data-field="price" />
+      <input type="number" min="0" step="25" value="${item.cost == null ? '' : item.cost}" placeholder="cost" data-field="cost" />
+      <div class="profit-tag" data-profit>${formatProfit(item.price, item.cost)}</div>
+      <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
+      <button class="action" data-save="${item.id}">Save</button>
+      <button class="action action--danger" data-delete="${item.id}">Delete</button>
+    </div>`;
+
   const topLevelHtml = TOP_BIN_ORDER.map(bin => {
     const items = grouped[bin] || [];
     return `
@@ -488,13 +517,31 @@ async function loadCatalogAdmin(){
           return `
             <div class="perf-subgroup">
               <div class="perf-subgroup-label">${PERF_LABELS[bin] || bin} <span class="count">(${items.length})</span></div>
-              ${items.map(itemRow).join('') || '<div class="empty-note">No items in this category yet.</div>'}
+              <div class="item-row item-row--perf item-row--head">
+                <div>Name</div><div>Price</div><div>Cost</div><div>Profit</div><div>Sort</div><div></div><div></div>
+              </div>
+              ${items.map(perfItemRow).join('') || '<div class="empty-note">No items in this category yet.</div>'}
             </div>`;
         }).join('')}
       </div>
     </details>`;
 
   container.innerHTML = perfHtml + topLevelHtml;
+
+  // Live-update the profit readout as price/cost are edited, before saving
+  container.querySelectorAll('.item-row--perf[data-row]').forEach(row => {
+    const priceInput = row.querySelector('[data-field="price"]');
+    const costInput = row.querySelector('[data-field="cost"]');
+    const profitTag = row.querySelector('[data-profit]');
+    const recompute = () => {
+      profitTag.textContent = formatProfit(
+        priceInput.value === '' ? null : Number(priceInput.value),
+        costInput.value === '' ? null : Number(costInput.value)
+      );
+    };
+    priceInput.addEventListener('input', recompute);
+    costInput.addEventListener('input', recompute);
+  });
 
   container.querySelectorAll('[data-save]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -503,11 +550,16 @@ async function loadCatalogAdmin(){
       const name = row.querySelector('[data-field="name"]').value.trim();
       const priceRaw = row.querySelector('[data-field="price"]').value;
       const sortOrder = Number(row.querySelector('[data-field="sort_order"]').value) || 0;
+      const costField = row.querySelector('[data-field="cost"]');
+      const costRaw = costField ? costField.value : '';
 
       if(!name){ flashAlert('Name cannot be empty.'); return; }
 
+      const payload = { id, name, price: priceRaw === '' ? null : Number(priceRaw), sort_order:sortOrder };
+      if(costField) payload.cost = costRaw === '' ? null : Number(costRaw);
+
       try{
-        await callAdminFn('save_item', { id, name, price: priceRaw === '' ? null : Number(priceRaw), sort_order:sortOrder });
+        await callAdminFn('save_item', payload);
         flashAlert(`${name} saved.`, 'Saved');
       }catch(err){
         flashAlert('Save failed: ' + err.message);
@@ -535,23 +587,27 @@ document.getElementById('addItemBtn').addEventListener('click', async () => {
   const id = document.getElementById('newId').value.trim();
   const name = document.getElementById('newName').value.trim();
   const priceRaw = document.getElementById('newPrice').value;
+  const costRaw = document.getElementById('newCost').value;
 
   if(!id || !name){ flashAlert('ID and Name are both required.'); return; }
 
   const type = bin === 'parts' ? 'part' : bin === 'cosmetics' ? 'cos' : 'perf';
   const category = (bin === 'parts' || bin === 'cosmetics') ? null : bin;
+  const binLabel = BIN_LABELS[bin] || PERF_LABELS[bin] || bin;
 
   try{
     await callAdminFn('add_item', {
       id, name, bin, type, category,
       price: priceRaw === '' ? null : Number(priceRaw),
+      cost: costRaw === '' ? null : Number(costRaw),
       sort_order: 999
     });
 
     document.getElementById('newId').value = '';
     document.getElementById('newName').value = '';
     document.getElementById('newPrice').value = '';
-    flashAlert(`${name} added to ${BIN_LABELS[bin]}.`, 'Added');
+    document.getElementById('newCost').value = '';
+    flashAlert(`${name} added to ${binLabel}.`, 'Added');
     loadCatalogAdmin();
   }catch(err){
     flashAlert('Add failed: ' + err.message);
