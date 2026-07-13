@@ -67,7 +67,7 @@
   .action{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     padding:10px 16px;border-radius:8px;border:1px solid var(--steel);
-    background:var(--steel-soft);color:var(--ink);cursor:pointer;
+    background:var(--steel-soft);color:var(--ink);cursor:pointer;text-decoration:none;
     font-family:var(--font-display);font-weight:600;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;
   }
   .action:hover{border-color:var(--amber)}
@@ -105,12 +105,20 @@
   }
   .stub[aria-selected="true"]{color:var(--amber);background:var(--plate)}
 
-  .bin-group{margin-bottom:18px}
-  .bin-group:last-child{margin-bottom:0}
-  .bin-group h3{
-    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;
-    font-size:.85rem;color:var(--amber);padding-bottom:8px;border-bottom:1px solid var(--steel-soft);margin-bottom:10px;
+  .bin-group{
+    margin-bottom:10px;border:1px solid var(--steel);border-radius:8px;
+    background:var(--plate);overflow:hidden;
   }
+  .bin-group:last-child{margin-bottom:0}
+  .bin-group summary{
+    list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;font-size:.85rem;color:var(--amber);
+  }
+  .bin-group summary::-webkit-details-marker{display:none}
+  .bin-group summary::after{content:"+";color:var(--dim);font-size:1.1rem;font-family:var(--font-body)}
+  .bin-group[open] summary::after{content:"–"}
+  .bin-group summary .count{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--font-mono);font-size:.75rem}
+  .bin-group-body{padding:4px 14px 10px}
 
   .item-row{
     display:grid;grid-template-columns:1fr 110px 70px auto auto;gap:8px;align-items:center;
@@ -172,7 +180,8 @@
           <div class="sub" id="whoami">Not signed in</div>
         </div>
       </div>
-      <div>
+      <div style="display:flex;gap:10px">
+        <a class="action" href="index.html">← Back to Calculator</a>
         <button class="action" id="signOutBtn" hidden>Sign Out</button>
       </div>
     </header>
@@ -440,17 +449,19 @@ async function loadCatalogAdmin(){
   container.innerHTML = BIN_ORDER.map(bin => {
     const items = grouped[bin] || [];
     return `
-      <div class="bin-group">
-        <h3>${BIN_LABELS[bin] || bin} <span style="color:var(--dim);font-weight:400">(${items.length})</span></h3>
-        ${items.map(item => `
-          <div class="item-row" data-row="${item.id}">
-            <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
-            <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="custom" data-field="price" />
-            <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
-            <button class="action" data-save="${item.id}">Save</button>
-            <button class="action action--danger" data-delete="${item.id}">Delete</button>
-          </div>`).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
-      </div>`;
+      <details class="bin-group">
+        <summary>${BIN_LABELS[bin] || bin} <span class="count">(${items.length})</span></summary>
+        <div class="bin-group-body">
+          ${items.map(item => `
+            <div class="item-row" data-row="${item.id}">
+              <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
+              <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="custom" data-field="price" />
+              <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
+              <button class="action" data-save="${item.id}">Save</button>
+              <button class="action action--danger" data-delete="${item.id}">Delete</button>
+            </div>`).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
+        </div>
+      </details>`;
   }).join('');
 
   container.querySelectorAll('[data-save]').forEach(btn => {
