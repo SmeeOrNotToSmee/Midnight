@@ -120,6 +120,14 @@
   .bin-group summary .count{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--font-mono);font-size:.75rem}
   .bin-group-body{padding:4px 14px 10px}
 
+  .perf-subgroup{margin-bottom:14px}
+  .perf-subgroup:last-child{margin-bottom:0}
+  .perf-subgroup-label{
+    font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;
+    font-size:.78rem;color:var(--amber);padding-bottom:6px;border-bottom:1px solid var(--steel-soft);margin-bottom:8px;
+  }
+  .perf-subgroup-label .count{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--font-mono);font-size:.72rem}
+
   .item-row{
     display:grid;grid-template-columns:1fr 110px 70px auto auto;gap:8px;align-items:center;
     padding:8px 0;border-bottom:1px solid var(--steel-soft);
@@ -282,12 +290,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const SESSION_KEY = 'midnight_admin_session';
 
 const BIN_LABELS = {
-  parts:'Parts & Body', cosmetics:'Cosmetic Upgrades',
-  brakes:'Performance: Brakes', suspension:'Performance: Suspension',
-  transmission:'Performance: Transmission', armor:'Performance: Armor',
-  turbo:'Performance: Turbo', engine:'Performance: Engine'
+  parts:'Parts & Body', cosmetics:'Cosmetic Upgrades'
 };
-const BIN_ORDER = ['parts','cosmetics','brakes','suspension','transmission','armor','turbo','engine'];
+const PERF_LABELS = {
+  engine:'Engine', brakes:'Brakes', suspension:'Suspension',
+  transmission:'Transmission', armor:'Armor', turbo:'Turbo'
+};
+const PERF_ORDER = ['engine','brakes','suspension','transmission','armor','turbo'];
+const TOP_BIN_ORDER = ['parts','cosmetics'];
+const BIN_ORDER = [...TOP_BIN_ORDER, ...PERF_ORDER];
 const money = n => n == null ? '—' : '$' + Number(n).toFixed(2);
 
 // ---------- Alert / confirm dialogs ----------
@@ -446,23 +457,43 @@ async function loadCatalogAdmin(){
   BIN_ORDER.forEach(b => grouped[b] = []);
   data.forEach(row => { if(grouped[row.bin]) grouped[row.bin].push(row); else (grouped[row.bin] = grouped[row.bin] || []).push(row); });
 
-  container.innerHTML = BIN_ORDER.map(bin => {
+  const itemRow = item => `
+    <div class="item-row" data-row="${item.id}">
+      <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
+      <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="custom" data-field="price" />
+      <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
+      <button class="action" data-save="${item.id}">Save</button>
+      <button class="action action--danger" data-delete="${item.id}">Delete</button>
+    </div>`;
+
+  const topLevelHtml = TOP_BIN_ORDER.map(bin => {
     const items = grouped[bin] || [];
     return `
       <details class="bin-group">
         <summary>${BIN_LABELS[bin] || bin} <span class="count">(${items.length})</span></summary>
         <div class="bin-group-body">
-          ${items.map(item => `
-            <div class="item-row" data-row="${item.id}">
-              <input type="text" value="${escapeAttr(item.name)}" data-field="name" />
-              <input type="number" min="0" step="25" value="${item.price == null ? '' : item.price}" placeholder="custom" data-field="price" />
-              <input type="number" value="${item.sort_order}" data-field="sort_order" title="Sort order" />
-              <button class="action" data-save="${item.id}">Save</button>
-              <button class="action action--danger" data-delete="${item.id}">Delete</button>
-            </div>`).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
+          ${items.map(itemRow).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
         </div>
       </details>`;
   }).join('');
+
+  const perfTotal = PERF_ORDER.reduce((sum, bin) => sum + (grouped[bin] || []).length, 0);
+  const perfHtml = `
+    <details class="bin-group">
+      <summary>Performance <span class="count">(${perfTotal})</span></summary>
+      <div class="bin-group-body">
+        ${PERF_ORDER.map(bin => {
+          const items = grouped[bin] || [];
+          return `
+            <div class="perf-subgroup">
+              <div class="perf-subgroup-label">${PERF_LABELS[bin] || bin} <span class="count">(${items.length})</span></div>
+              ${items.map(itemRow).join('') || '<div class="empty-note">No items in this category yet.</div>'}
+            </div>`;
+        }).join('')}
+      </div>
+    </details>`;
+
+  container.innerHTML = topLevelHtml + perfHtml;
 
   container.querySelectorAll('[data-save]').forEach(btn => {
     btn.addEventListener('click', async () => {
