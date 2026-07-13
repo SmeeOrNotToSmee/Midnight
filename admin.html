@@ -11,7 +11,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
   :root{
@@ -187,9 +186,7 @@
     <!-- Signed in, not an admin -->
     <div class="center-card" id="screenUnauthorized" hidden>
       <h2 style="font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em">Not Authorized</h2>
-      <p>Access is granted to anyone holding the <strong>Midnight</strong> role in the Discord server. We didn't find that role on this account.</p>
-      <p>If you were just given the role, sign out and back in to re-check. Otherwise, an existing admin can grant access manually by running this in the Supabase SQL editor:</p>
-      <div class="uid-box" id="grantSql"></div>
+      <p id="unauthorizedMessage">You're logged into Discord, but don't have the Midnight role for this server.</p>
       <button class="action" id="signOutBtn2">Sign Out</button>
     </div>
 
@@ -261,12 +258,18 @@
   </dialog>
 
 <script>
-// ---------- Supabase ----------
+// ---------- Config ----------
+const DISCORD_CLIENT_ID = '1523389009227808848';
+const MIDNIGHT_AUTH_URL = 'https://gpaqlehknskrcthyaapo.supabase.co/functions/v1/midnight-auth';
+const MIDNIGHT_ADMIN_URL = 'https://gpaqlehknskrcthyaapo.supabase.co/functions/v1/midnight-admin';
+
+// Public reads still go straight to Supabase's REST API with the anon key —
+// safe, since mc_catalog_items has a "public read" policy. Writes never use
+// this key; they go through midnight-admin instead.
 const SUPABASE_URL = 'https://gpaqlehknskrcthyaapo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwYXFsZWhrbnNrcmN0aHlhYXBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NjQwMjEsImV4cCI6MjA5ODI0MDAyMX0.pVsGNoYVNsh6w0RTTCajtveVJ12wgxxgP1Vqhl2EOxQ';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storageKey: 'mc-night-garage-admin-auth' }
-});
+
+const SESSION_KEY = 'midnight_admin_session';
 
 const BIN_LABELS = {
   parts:'Parts & Body', cosmetics:'Cosmetic Upgrades',
@@ -303,31 +306,25 @@ document.getElementById('slipConfirmOk').onclick = () => {
   confirmCallback = null;
 };
 
-// ---------- Discord role gate ----------
-const DISCORD_GUILD_ID = '1109059313437261834';
-const MIDNIGHT_ROLE_ID = '1526151086858043503';
-
-async function checkMidnightRole(providerToken){
-  const res = await fetch(`https://discord.com/api/users/@me/guilds/${DISCORD_GUILD_ID}/member`, {
-    headers: { Authorization: `Bearer ${providerToken}` }
-  });
-  if(!res.ok) return false; // not a member of that server, or token missing the scope
-  const member = await res.json();
-  return Array.isArray(member.roles) && member.roles.includes(MIDNIGHT_ROLE_ID);
+// ---------- Discord session (matches Bean's discord-auth flow) ----------
+function decodeSessionPayload(token){
+  try{
+    const [payloadB64] = token.split('.');
+    const normalized = payloadB64.replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(atob(normalized));
+  }catch{ return null; }
 }
 
-// ---------- Auth ----------
-document.getElementById('signInBtn').addEventListener('click', () => {
-  sb.auth.signInWithOAuth({
-    provider:'discord',
-    options:{
-      redirectTo: window.location.href,
-      scopes:'identify guilds.members.read'
-    }
-  });
-});
-document.getElementById('signOutBtn').addEventListener('click', () => sb.auth.signOut());
-document.getElementById('signOutBtn2').addEventListener('click', () => sb.auth.signOut());
+function getSessionToken(){
+  return localStorage.getItem(SESSION_KEY);
+}
+
+function hasValidSession(){
+  const token = getSessionToken();
+  if(!token) return false;
+  const payload = decodeSessionPayload(token);
+  return !!(payload && payload.exp && payload.exp > Date.now());
+}
 
 function showScreen(name){
   document.getElementById('screenLogin').hidden = name !== 'login';
@@ -336,45 +333,57 @@ function showScreen(name){
   document.getElementById('signOutBtn').hidden = name === 'login';
 }
 
-async function handleSession(session){
-  if(!session){
-    document.getElementById('whoami').textContent = 'Not signed in';
+document.getElementById('signInBtn').addEventListener('click', () => {
+  const params = new URLSearchParams({
+    client_id: DISCORD_CLIENT_ID,
+    redirect_uri: MIDNIGHT_AUTH_URL,
+    response_type: 'code',
+    scope: 'identify guilds.members.read'
+  });
+  window.location.href = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+});
+
+function signOut(){
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('whoami').textContent = 'Not signed in';
+  showScreen('login');
+}
+document.getElementById('signOutBtn').addEventListener('click', signOut);
+document.getElementById('signOutBtn2').addEventListener('click', signOut);
+
+function boot(){
+  // Handle the redirect back from midnight-auth carrying a signed session token
+  if(location.hash.startsWith('#session=')){
+    const token = decodeURIComponent(location.hash.slice('#session='.length));
+    localStorage.setItem(SESSION_KEY, token);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  const authParam = new URLSearchParams(location.search).get('auth');
+
+  if(authParam === 'denied'){
+    document.getElementById('unauthorizedMessage').textContent =
+      "You're logged into Discord, but don't have the Midnight role for this server.";
+    showScreen('unauthorized');
+    return;
+  }
+  if(authParam === 'error'){
+    flashAlert('Something went wrong logging in. Please try again.');
     showScreen('login');
     return;
   }
 
-  const user = session.user;
-  const discordName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Signed in';
-  document.getElementById('whoami').textContent = discordName;
-
-  // Fresh Discord logins carry a one-time provider token — use it to check
-  // the Midnight role right now and self-register as admin if it's present.
-  if(session.provider_token){
-    try{
-      const hasRole = await checkMidnightRole(session.provider_token);
-      if(hasRole){
-        await sb.from('mc_admins').upsert({ user_id:user.id, note:'auto-granted via Midnight role' });
-      }
-    }catch(err){
-      console.warn('Could not verify the Midnight role right now.', err);
-    }
+  if(hasValidSession()){
+    const payload = decodeSessionPayload(getSessionToken());
+    document.getElementById('whoami').textContent = payload?.name || 'Signed in';
+    showScreen('admin');
+    loadCatalogAdmin();
+    loadOrdersAdmin();
+  }else{
+    showScreen('login');
   }
-
-  const { data: adminRow } = await sb.from('mc_admins').select('user_id').eq('user_id', user.id).maybeSingle();
-
-  if(!adminRow){
-    document.getElementById('grantSql').textContent = `insert into mc_admins (user_id) values ('${user.id}');`;
-    showScreen('unauthorized');
-    return;
-  }
-
-  showScreen('admin');
-  loadCatalogAdmin();
-  loadOrdersAdmin();
 }
-
-sb.auth.getSession().then(({ data:{ session } }) => handleSession(session));
-sb.auth.onAuthStateChange((_event, session) => handleSession(session));
+boot();
 
 // ---------- Tabs ----------
 document.querySelectorAll('[data-stub]').forEach(stub => {
@@ -386,15 +395,40 @@ document.querySelectorAll('[data-stub]').forEach(stub => {
   });
 });
 
+// ---------- midnight-admin call helper ----------
+async function callAdminFn(action, payload){
+  const res = await fetch(MIDNIGHT_ADMIN_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ token:getSessionToken(), action, payload })
+  });
+  const body = await res.json();
+  if(!res.ok){
+    if(res.status === 401){
+      signOut();
+      throw new Error('Your session expired. Please sign in again.');
+    }
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return body.data;
+}
+
 // ---------- Catalog management ----------
 async function loadCatalogAdmin(){
   const container = document.getElementById('catalogGroups');
   container.innerHTML = '<div class="empty-note">Loading catalog…</div>';
 
-  const { data, error } = await sb.from('mc_catalog_items').select('*').order('bin').order('sort_order');
-  if(error){
+  let data;
+  try{
+    // Direct anon read — mc_catalog_items allows public SELECT.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/mc_catalog_items?select=*&order=bin.asc,sort_order.asc`, {
+      headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    if(!res.ok) throw new Error(`Read failed: ${res.status}`);
+    data = await res.json();
+  }catch(err){
     container.innerHTML = '<div class="empty-note">Could not load catalog.</div>';
-    console.error(error);
+    console.error(err);
     return;
   }
 
@@ -428,14 +462,12 @@ async function loadCatalogAdmin(){
 
       if(!name){ flashAlert('Name cannot be empty.'); return; }
 
-      const { error } = await sb.from('mc_catalog_items').update({
-        name,
-        price: priceRaw === '' ? null : Number(priceRaw),
-        sort_order: sortOrder
-      }).eq('id', id);
-
-      if(error){ flashAlert('Save failed: ' + error.message); return; }
-      flashAlert(`${name} saved.`, 'Saved');
+      try{
+        await callAdminFn('save_item', { id, name, price: priceRaw === '' ? null : Number(priceRaw), sort_order:sortOrder });
+        flashAlert(`${name} saved.`, 'Saved');
+      }catch(err){
+        flashAlert('Save failed: ' + err.message);
+      }
     });
   });
 
@@ -443,9 +475,12 @@ async function loadCatalogAdmin(){
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-delete');
       flashConfirm(`Delete "${id}" from the catalog? This cannot be undone.`, async () => {
-        const { error } = await sb.from('mc_catalog_items').delete().eq('id', id);
-        if(error){ flashAlert('Delete failed: ' + error.message); return; }
-        loadCatalogAdmin();
+        try{
+          await callAdminFn('delete_item', { id });
+          loadCatalogAdmin();
+        }catch(err){
+          flashAlert('Delete failed: ' + err.message);
+        }
       }, 'Delete Item?');
     });
   });
@@ -462,19 +497,21 @@ document.getElementById('addItemBtn').addEventListener('click', async () => {
   const type = bin === 'parts' ? 'part' : bin === 'cosmetics' ? 'cos' : 'perf';
   const category = (bin === 'parts' || bin === 'cosmetics') ? null : bin;
 
-  const { error } = await sb.from('mc_catalog_items').insert({
-    id, name, bin, type, category,
-    price: priceRaw === '' ? null : Number(priceRaw),
-    sort_order: 999
-  });
+  try{
+    await callAdminFn('add_item', {
+      id, name, bin, type, category,
+      price: priceRaw === '' ? null : Number(priceRaw),
+      sort_order: 999
+    });
 
-  if(error){ flashAlert('Add failed: ' + error.message); return; }
-
-  document.getElementById('newId').value = '';
-  document.getElementById('newName').value = '';
-  document.getElementById('newPrice').value = '';
-  flashAlert(`${name} added to ${BIN_LABELS[bin]}.`, 'Added');
-  loadCatalogAdmin();
+    document.getElementById('newId').value = '';
+    document.getElementById('newName').value = '';
+    document.getElementById('newPrice').value = '';
+    flashAlert(`${name} added to ${BIN_LABELS[bin]}.`, 'Added');
+    loadCatalogAdmin();
+  }catch(err){
+    flashAlert('Add failed: ' + err.message);
+  }
 });
 
 // ---------- Orders ----------
@@ -482,10 +519,12 @@ async function loadOrdersAdmin(){
   const list = document.getElementById('ordersList');
   list.innerHTML = '<div class="empty-note">Loading orders…</div>';
 
-  const { data, error } = await sb.from('mc_orders').select('*').order('created_at', { ascending:false }).limit(200);
-  if(error){
+  let data;
+  try{
+    data = await callAdminFn('list_orders', {});
+  }catch(err){
     list.innerHTML = '<div class="empty-note">Could not load orders.</div>';
-    console.error(error);
+    console.error(err);
     return;
   }
 
@@ -518,9 +557,12 @@ async function loadOrdersAdmin(){
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-strike');
       flashConfirm('Delete this order from history? This cannot be undone.', async () => {
-        const { error } = await sb.from('mc_orders').delete().eq('id', id);
-        if(error){ flashAlert('Delete failed: ' + error.message); return; }
-        loadOrdersAdmin();
+        try{
+          await callAdminFn('delete_order', { id });
+          loadOrdersAdmin();
+        }catch(err){
+          flashAlert('Delete failed: ' + err.message);
+        }
       }, 'Delete Order?');
     });
   });
