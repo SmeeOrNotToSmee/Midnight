@@ -91,7 +91,7 @@
   .action{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     padding:10px 16px;border-radius:8px;border:1px solid var(--steel);
-    background:var(--steel-soft);color:var(--ink);cursor:pointer;
+    background:var(--steel-soft);color:var(--ink);cursor:pointer;text-decoration:none;
     font-family:var(--font-display);font-weight:600;letter-spacing:.02em;text-transform:uppercase;font-size:.88rem;
   }
   .action:hover{border-color:var(--amber)}
@@ -269,6 +269,7 @@
         </div>
       </div>
       <div class="controls">
+        <a class="action" href="admin.html">🔑 Admin</a>
         <button class="action" id="lightsBtn" aria-pressed="true">☀️ Lights On</button>
       </div>
     </header>
@@ -279,7 +280,7 @@
         <h2>Parts <b>Catalog</b></h2>
         <div class="plate-body">
 
-          <details class="bin" open>
+          <details class="bin">
             <summary><span class="bin-title">Performance</span> <span class="count" id="count-performance"></span></summary>
 
             <div class="perf-group">
