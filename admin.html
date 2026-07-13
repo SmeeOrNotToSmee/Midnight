@@ -111,12 +111,13 @@
   }
   .bin-group:last-child{margin-bottom:0}
   .bin-group summary{
-    list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:8px;
     font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em;font-size:.85rem;color:var(--amber);
   }
   .bin-group summary::-webkit-details-marker{display:none}
   .bin-group summary::after{content:"+";color:var(--dim);font-size:1.1rem;font-family:var(--font-body)}
   .bin-group[open] summary::after{content:"–"}
+  .bin-group summary .bin-title{flex:1}
   .bin-group summary .count{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0;font-family:var(--font-mono);font-size:.75rem}
   .bin-group-body{padding:4px 14px 10px}
 
@@ -470,7 +471,7 @@ async function loadCatalogAdmin(){
     const items = grouped[bin] || [];
     return `
       <details class="bin-group">
-        <summary>${BIN_LABELS[bin] || bin} <span class="count">(${items.length})</span></summary>
+        <summary><span class="bin-title">${BIN_LABELS[bin] || bin}</span> <span class="count">(${items.length})</span></summary>
         <div class="bin-group-body">
           ${items.map(itemRow).join('') || '<div class="empty-note">No items in this bin yet.</div>'}
         </div>
@@ -480,7 +481,7 @@ async function loadCatalogAdmin(){
   const perfTotal = PERF_ORDER.reduce((sum, bin) => sum + (grouped[bin] || []).length, 0);
   const perfHtml = `
     <details class="bin-group">
-      <summary>Performance <span class="count">(${perfTotal})</span></summary>
+      <summary><span class="bin-title">Performance</span> <span class="count">(${perfTotal})</span></summary>
       <div class="bin-group-body">
         ${PERF_ORDER.map(bin => {
           const items = grouped[bin] || [];
@@ -493,7 +494,7 @@ async function loadCatalogAdmin(){
       </div>
     </details>`;
 
-  container.innerHTML = topLevelHtml + perfHtml;
+  container.innerHTML = perfHtml + topLevelHtml;
 
   container.querySelectorAll('[data-save]').forEach(btn => {
     btn.addEventListener('click', async () => {
